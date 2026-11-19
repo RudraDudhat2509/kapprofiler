@@ -333,6 +333,13 @@ func (cm *CollectorManager) CollectContainerEvents(id *ContainerId) {
 		// Add syscalls to container profile
 		containerProfile.SysCalls = append(containerProfile.SysCalls, totalEvents.SyscallEvents...)
 
+		// Mount paths for this pod, used below to tag execs and filter opens
+		// that resolve into a mounted volume rather than the container's own
+		// image.
+		cm.podMountCacheMutex.Lock()
+		mounts := cm.podMountCache[fmt.Sprintf("%s-%s", id.PodName, id.Namespace)]
+		cm.podMountCacheMutex.Unlock()
+
 		// Add execve events to container profile
 		for _, event := range totalEvents.ExecEvents {
 			// Check if execve event is already in container profile or if it has no path name (Some execve events do not have a path name).
@@ -342,6 +349,7 @@ func (cm *CollectorManager) CollectContainerEvents(id *ContainerId) {
 					UpperLayer: event.UpperLayer,
 					Args:       event.Args,
 					Envs:       event.Env,
+					FromMount:  isPathUnderMount(event.PathName, mounts),
 				})
 			}
 		}
@@ -378,9 +386,6 @@ func (cm *CollectorManager) CollectContainerEvents(id *ContainerId) {
 		}
 
 		// Add open events to container profile
-		cm.podMountCacheMutex.Lock()
-		mounts := cm.podMountCache[fmt.Sprintf("%s-%s", id.PodName, id.Namespace)]
-		cm.podMountCacheMutex.Unlock()
 		for _, event := range totalEvents.OpenEvents {
 			if cm.shouldIncludeOpenEvent(event, containerProfile.Opens, mounts) {
 				openEvent := OpenCalls{
@@ -857,15 +862,22 @@ func (cm *CollectorManager) shouldIncludeOpenEvent(openEvent *tracing.OpenEvent,
 	}
 
 	// Check if we should ignore mounts.
-	if cm.config.IgnoreMounts {
-		for _, mount := range mounts {
-			if strings.HasPrefix(openEvent.PathName, mount) {
-				return false
-			}
-		}
+	if cm.config.IgnoreMounts && isPathUnderMount(openEvent.PathName, mounts) {
+		return false
 	}
 
 	return true
+}
+
+// isPathUnderMount reports whether path falls under one of the pod's mount
+// paths, rather than coming from the container's own image.
+func isPathUnderMount(path string, mounts []string) bool {
+	for _, mount := range mounts {
+		if strings.HasPrefix(path, mount) {
+			return true
+		}
+	}
+	return false
 }
 
 func (cm *CollectorManager) getPodMounts(podName, namespace string) ([]string, error) {

@@ -355,6 +355,35 @@ func getContainerProfile(k8sConfig *rest.Config, namespace string, pod string) (
 	return nil, fmt.Errorf("App profile %s not found", name)
 }
 
+func TestIsPathUnderMount(t *testing.T) {
+	mounts := []string{"/var/lib/data", "/mnt/config"}
+
+	cases := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{"path under a mount", "/var/lib/data/app.sh", true},
+		{"path under a different mount", "/mnt/config/run.sh", true},
+		{"path not under any mount", "/usr/bin/bash", false},
+		{"prefix match without path separator still counts", "/var/lib/dataextra/x", true},
+		{"no mounts at all", "/var/lib/data/app.sh", true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := collector.IsPathUnderMountForTest(tc.path, mounts)
+			if got != tc.want {
+				t.Errorf("isPathUnderMount(%q, %v) = %v, want %v", tc.path, mounts, got, tc.want)
+			}
+		})
+	}
+
+	if collector.IsPathUnderMountForTest("/var/lib/data/app.sh", nil) {
+		t.Errorf("expected no match with an empty mounts list")
+	}
+}
+
 // Test that a openapispec can be generated from the structs
 func TestOpenApiSpec(t *testing.T) {
 	schemaRef, err := openapi3gen.NewSchemaRefForValue(&collector.ApplicationProfileSpec{}, nil)

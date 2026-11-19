@@ -10,6 +10,7 @@ type ExecCalls struct {
 	UpperLayer bool     `json:"upperLayer" yaml:"upperLayer"`
 	Args       []string `json:"args" yaml:"args"`
 	Envs       []string `json:"envs" yaml:"envs"`
+	FromMount  bool     `json:"fromMount" yaml:"fromMount"`
 }
 
 type NetworkCalls struct {
