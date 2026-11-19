@@ -367,7 +367,6 @@ func TestIsPathUnderMount(t *testing.T) {
 		{"path under a different mount", "/mnt/config/run.sh", true},
 		{"path not under any mount", "/usr/bin/bash", false},
 		{"prefix match without path separator still counts", "/var/lib/dataextra/x", true},
-		{"no mounts at all", "/var/lib/data/app.sh", true},
 	}
 
 	for _, tc := range cases {

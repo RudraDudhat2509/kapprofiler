@@ -59,6 +59,8 @@ spec:
                             type: array
                             items:
                               type: string
+                          fromMount:
+                            type: boolean
                           path:
                             type: string
                           upperLayer:
